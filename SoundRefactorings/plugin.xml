@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.commands">
+      <category
+            name="Sound Refactorings"
+            id="SoundRefactorings.commands.category">
+      </category>
+      <command
+            name="Inline Temp"
+            categoryId="SoundRefactorings.commands.category"
+            id="SoundRefactorings.commands.sampleCommand">
+      </command>
+   </extension>
+   <extension
+         point="org.eclipse.ui.handlers">
+      <handler
+            commandId="SoundRefactorings.commands.sampleCommand"
+            class="soundrefactorings.RefactoringHandler">
+      </handler>
+   </extension>
+   <extension
+         point="org.eclipse.ui.bindings">
+      <key
+            commandId="SoundRefactorings.commands.sampleCommand"
+            contextId="org.eclipse.ui.contexts.window"
+            sequence="M1+6"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration">
+      </key>
+   </extension>
+   <extension
+         point="org.eclipse.ui.menus">
+      <menuContribution
+            locationURI="menu:org.eclipse.ui.main.menu?after=additions">
+         <menu
+               label="Sound Refactorings"
+               mnemonic="M"
+               id="SoundRefactorings.menus.sampleMenu">
+            <command
+                  commandId="SoundRefactorings.commands.sampleCommand"
+                  mnemonic="S"
+                  id="SoundRefactorings.menus.sampleCommand">
+            </command>
+         </menu>
+      </menuContribution>
+      <menuContribution
+            locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
+         <toolbar
+               id="SoundRefactorings.toolbars.sampleToolbar">
+            <command
+                  commandId="SoundRefactorings.commands.sampleCommand"
+                  icon="icons/sample.gif"
+                  tooltip="Say hello world"
+                  id="SoundRefactorings.toolbars.sampleCommand">
+            </command>
+         </toolbar>
+      </menuContribution>
+   </extension>
+
+</plugin>
