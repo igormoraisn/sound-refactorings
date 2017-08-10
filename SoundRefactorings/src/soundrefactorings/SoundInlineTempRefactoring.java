@@ -51,6 +51,7 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		right = fVariableDeclaration.getInitializer();
 		SimpleNameVisitor vis = new SimpleNameVisitor();
 		right.accept(vis);
+		int pos = right.getStartPosition();
 		List<SimpleName> vard = vis.getMethods(); 
 		nodeSelected = nodeSelected.getParent();
 		nodeSelected = nodeSelected.getParent();
@@ -59,8 +60,10 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		List<String> simplename = new ArrayList<String>();
 		for(Assignment as : assignmentVisitor.getMethods()){
 			SimpleName aux = (SimpleName) as.getLeftHandSide();
-			simplename.add(aux+"");
-			
+			int positionAssig = aux.getStartPosition();
+			if(positionAssig > pos){
+				simplename.add(convertToString(aux));
+			}
 		}
 		for(SimpleName sn : vard){
 			if(simplename.contains(convertToString(sn))){
