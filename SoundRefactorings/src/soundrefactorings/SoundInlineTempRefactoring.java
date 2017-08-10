@@ -61,15 +61,13 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		for(Assignment as : assignmentVisitor.getMethods()){
 			SimpleName aux = (SimpleName) as.getLeftHandSide();
 			int positionAssig = aux.getStartPosition();
-			if(positionAssig > pos){
+			if(positionAssig > pos)
 				simplename.add(convertToString(aux));
-			}
 		}
 		for(SimpleName sn : vard){
-			if(simplename.contains(convertToString(sn))){
+			if(simplename.contains(convertToString(sn)))
 				error = true;
-			}
-        }
+        	}
 		if(error)
 			return RefactoringStatus.createErrorStatus("One or most variables changed after expression");
 		else
@@ -82,24 +80,22 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 	private String convertToString(Object a){
 		return a + "";
 	}
-    private static CompilationUnit parse(ICompilationUnit unit) {
-        ASTParser parser = ASTParser.newParser(AST.JLS3);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(unit);
-        parser.setResolveBindings(true);
-        return (CompilationUnit) parser.createAST(null); // parse
-    }
+    	private static CompilationUnit parse(ICompilationUnit unit) {
+        	ASTParser parser = ASTParser.newParser(AST.JLS3);
+        	parser.setKind(ASTParser.K_COMPILATION_UNIT);
+        	parser.setSource(unit);
+        	parser.setResolveBindings(true);
+        	return (CompilationUnit) parser.createAST(null); // parse
+    	}
 	private CompilationUnit getASTRoot() {
-		if (fASTRoot == null) {
+		if (fASTRoot == null)
 			fASTRoot= RefactoringASTParser.parseWithASTProvider(fCu, true, null);
-		}
 		return fASTRoot;
 	}
 
 	public VariableDeclaration getVariableDeclaration() {
-		if (fVariableDeclaration == null) {
+		if (fVariableDeclaration == null)
 			fVariableDeclaration= TempDeclarationFinder.findTempDeclaration(getASTRoot(), fSelectionStart, fSelectionLength);
-		}
 		return fVariableDeclaration;
 	}
 }
