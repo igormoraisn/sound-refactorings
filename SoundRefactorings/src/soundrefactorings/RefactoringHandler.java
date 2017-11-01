@@ -12,6 +12,7 @@ import org.eclipse.ui.ISelectionService;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.texteditor.ITextEditor;
+
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.text.ITextSelection;
 import org.eclipse.ltk.core.refactoring.Change;
@@ -43,14 +44,14 @@ public class RefactoringHandler extends AbstractHandler {
 			SoundInlineTempRefactoring iir = new SoundInlineTempRefactoring(un, its.getOffset(), its.getLength());
 			IProgressMonitor monitor = new NullProgressMonitor();
 			status = iir.checkInitialConditions(monitor);
-		    if(status.hasError()){
+		    /*if(status.hasError()){
 		    	MessageDialog.openError(shell, "Error", status.toString());
 		    }
 		    else{
 		    	iir.checkFinalConditions(monitor);
 			    Change change = iir.createChange(monitor);
 			    change.perform(monitor);
-		    }
+		    }*/
 			
 		} catch (Exception e) {
 		    // TODO Auto-generated catch block
