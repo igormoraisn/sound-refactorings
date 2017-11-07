@@ -44,6 +44,7 @@ import org.eclipse.text.edits.TextEdit;
 import org.eclipse.text.edits.UndoEdit;
 
 
+@SuppressWarnings("restriction")
 public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 	private int fSelectionStart;
 	private int fSelectionLength;
@@ -72,9 +73,12 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		AssignmentVisitor assignmentVisitor = new AssignmentVisitor();
 		right = fVariableDeclaration.getInitializer();
 		SimpleNameVisitor vis = new SimpleNameVisitor();
+		QualifiedNameVisitor qualifiedName = new QualifiedNameVisitor();
 		right.accept(vis);
 		int pos = right.getStartPosition();
 		List<SimpleName> vard = vis.getMethods(); 
+		right.accept(qualifiedName);
+		List<QualifiedName> fieldList = qualifiedName.getMethods(); 
 		nodeSelected = nodeSelected.getParent();
 		nodeSelected = nodeSelected.getParent();
 		nodeSelected = nodeSelected.getParent();
@@ -96,13 +100,17 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 				error = true;
 			}
         }
-		//doAssignmentAssertions(nodeSelected, fields);
+		for(QualifiedName qn : fieldList){
+			if(simplename.contains(convertToString(qn))){
+				error = true;
+			}
+        }
+		doAssignmentAssertions(nodeSelected, fields);
 		doMethodAssertions();
-		/*if(error)
+		if(error)
 			return RefactoringStatus.createErrorStatus("One or most variables changed after expression");
 		else
-			return super.checkInitialConditions(pm);*/
-		return new RefactoringStatus();
+			return super.checkInitialConditions(pm);
 	}
 	public void doAssignmentAssertions(ASTNode node, List<QualifiedName> fields) throws JavaModelException{
 		String source = fCu.getSource();
@@ -129,7 +137,7 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
         	}
         }
         // Primeira checagem
-        FieldAccessVisitor fa = new FieldAccessVisitor();
+        QualifiedNameVisitor fa = new QualifiedNameVisitor();
         right.accept(fa);
         List<QualifiedName> lfa = fa.getMethods();
         if(lfa.size() > 0){
@@ -198,7 +206,7 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
         		break;
         	}
         }
-        FieldAccessVisitor fa = new FieldAccessVisitor();
+        QualifiedNameVisitor fa = new QualifiedNameVisitor();
         MethodInvocationVisitor miv = new MethodInvocationVisitor();
         right.accept(fa);
         method.accept(miv);
@@ -224,7 +232,6 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
         	for(MethodInvocation m : lmi){
             	i=1;
             	for(QualifiedName qn : lfa){
-					//SimpleName left = ast.newSimpleName(convertToString(qn));
             		Name name = ast.newName(convertToString(qn.getQualifier()));
             		SimpleName sn = ast.newSimpleName(convertToString(qn.getName()));
             		QualifiedName left = ast.newQualifiedName(name, sn);
