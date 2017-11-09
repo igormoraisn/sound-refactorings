@@ -3,6 +3,8 @@ package soundrefactorings;
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.NullProgressMonitor;
 //import org.eclipse.core.runtime.IProgressMonitor;
 //import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -14,9 +16,11 @@ import org.eclipse.ui.ISelectionService;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.texteditor.ITextEditor;
-
+import org.eclipse.jface.dialogs.MessageDialog;
 //import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.text.ITextSelection;
+import org.eclipse.ltk.core.refactoring.Change;
+import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 //import org.eclipse.ltk.core.refactoring.Change;
 //import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizard;
@@ -42,11 +46,11 @@ public class RefactoringHandler extends AbstractHandler {
 		ICompilationUnit un = (ICompilationUnit) elem;
 		ISelectionService ss = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getSelectionService();
 		ITextSelection its = (ITextSelection) ss.getSelection();
-		//RefactoringStatus status = new RefactoringStatus();
+		RefactoringStatus status = new RefactoringStatus();
 		try {
 			Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
 			SoundInlineTempRefactoring iir = new SoundInlineTempRefactoring(un, its.getOffset(), its.getLength());
-			//IProgressMonitor monitor = new NullProgressMonitor();
+			IProgressMonitor monitor = new NullProgressMonitor();
 			RefactoringWizard rw = new InlineTempWizard(iir);
 			RefactoringStarter rs = new RefactoringStarter();
 			rs.activate(rw, shell, "Sound Inline Temp", 1);
