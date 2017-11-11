@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
@@ -16,26 +15,21 @@ import org.eclipse.jdt.core.dom.Assignment;
 import org.eclipse.jdt.core.dom.Block;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
-import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.InfixExpression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
-import org.eclipse.jdt.core.dom.NumberLiteral;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.Statement;
-import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
-import org.eclipse.jdt.core.dom.rewrite.ITrackedNodePosition;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.internal.corext.refactoring.code.InlineTempRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.rename.TempDeclarationFinder;
-import org.eclipse.jdt.internal.corext.refactoring.structure.CompilationUnitRewrite;
 import org.eclipse.jdt.internal.corext.refactoring.util.RefactoringASTParser;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
@@ -43,8 +37,6 @@ import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.text.edits.MalformedTreeException;
 import org.eclipse.text.edits.TextEdit;
-import org.eclipse.text.edits.UndoEdit;
-
 
 @SuppressWarnings("restriction")
 public class SoundInlineTempRefactoring extends InlineTempRefactoring{
@@ -53,38 +45,49 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 	private ICompilationUnit fCu;
 	private CompilationUnit fASTRoot;
 	private VariableDeclaration fVariableDeclaration;
+	private boolean fModifications;
+	private int nodePosition;
+	Expression right;
 	List<QualifiedName> fields = new ArrayList<QualifiedName>();
 	ASTRewrite rewrite;
 	ListRewrite listRewrite;
 	public SoundInlineTempRefactoring(ICompilationUnit unit, int selectionStart, int selectionLength){
 		super(unit, null, selectionStart, selectionLength);
-		this.fCu = unit;
-		this.fSelectionLength = selectionLength;
-		this.fSelectionStart = selectionStart;
-		this.fVariableDeclaration = null;
-		this.fASTRoot = null;
+		fCu = unit;
+		fSelectionLength = selectionLength;
+		fSelectionStart = selectionStart;
+		fVariableDeclaration = null;
+		fASTRoot = null;
+		fModifications = false;
 	}
 	@Override
 	public Change createChange(IProgressMonitor pm) throws CoreException {
 		Change change = super.createChange(pm);
-		String source = fCu.getSource();
-        Document document = new Document(source);
-		TextEdit edits = rewrite.rewriteAST(document, null);
-		UndoEdit undo;
-		try {
-			undo = edits.apply(document);
-        } catch (MalformedTreeException es) {
-            // TODO Auto-generated catch block
-            es.printStackTrace();
-        } catch (BadLocationException es) {
-            // TODO Auto-generated catch block
-            es.printStackTrace();
-        }
-		String newSource = document.get();
-		// update of the compilation unit
-		fCu.getBuffer().setContents(newSource);
-		return super.createChange(pm);
+		change.perform(pm);
+		System.out.println(fCu.getSource());
+		if(fModifications) {
+			doAssignmentAssertions();
+			doMethodAssertions();
+			String source = fCu.getSource();
+	        Document document = new Document(source);
+			TextEdit edits = rewrite.rewriteAST(document, null);
+			try {
+				edits.apply(document);
+	        } catch (MalformedTreeException es) {
+	            // TODO Auto-generated catch block
+	            es.printStackTrace();
+	        } catch (BadLocationException es) {
+	            // TODO Auto-generated catch block
+	            es.printStackTrace();
+	        }
+			String newSource = document.get();
+			// update of the compilation unit
+			fCu.getBuffer().setContents(newSource);
+			System.out.println(rewrite.toString());
+		}
+		return change;
 	}
+	
 	@Override
 	public RefactoringStatus checkInitialConditions(IProgressMonitor pm) throws CoreException {
 		CompilationUnit parse = parse(fCu);
@@ -92,8 +95,9 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		if(checkReadOnly(parse))
 			return RefactoringStatus.createFatalErrorStatus("One or most variables changed after expression");
 		else {
-			int totalAsserts = doAssignmentAssertions(nodeSelected) + doMethodAssertions();
+			int totalAsserts = checkAssignmentAssertions(nodeSelected) + checkMethodAssertions();
 			if(totalAsserts > 0) {
+				fModifications = true;
 				RefactoringStatus status = super.checkInitialConditions(pm);
 				status.addInfo(totalAsserts + " asserts will be generated");
 				return status;
@@ -101,9 +105,71 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 			return super.checkInitialConditions(pm);
 		}
 	}
-	public int doAssignmentAssertions(ASTNode node) throws CoreException{
+	public boolean checkReadOnly(CompilationUnit un) {
+		boolean error = false;
+		getVariableDeclaration();
+		right = fVariableDeclaration.getInitializer();
+		AssignmentVisitor assignmentVisitor = new AssignmentVisitor();
+		SimpleNameVisitor simpleNameVisitor = new SimpleNameVisitor();
+		QualifiedNameVisitor qualifiedNameVisitor = new QualifiedNameVisitor();
+		right.accept(simpleNameVisitor);
+		int expressionPosition = right.getStartPosition();
+		List<SimpleName> vard = simpleNameVisitor.getMethods(); 
+		right.accept(qualifiedNameVisitor);
+		List<QualifiedName> fieldList = qualifiedNameVisitor.getMethods(); 
+		MethodDeclaration methodVerified= getMethodDeclaration(un);
+		List<ASTNode> statementsList = methodVerified.getBody().statements();
+		int pos = fVariableDeclaration.getParent().getStartPosition();
+		int i = 0;
+		for(ASTNode node : statementsList) {
+			if(node.getStartPosition() == pos)
+				break;
+			i++;
+		}
+		nodePosition = i;
+		methodVerified.accept(assignmentVisitor);
+		List<String> variablesList = new ArrayList<String>();
+		for(Assignment assignment : assignmentVisitor.getMethods()){
+			Expression aux = assignment.getLeftHandSide();
+			int assignPosition = aux.getStartPosition();
+			if(assignPosition > expressionPosition){
+				if(aux.getNodeType() == 40){
+					fields.add((QualifiedName)aux);
+				}
+				variablesList.add(convertToString(aux));
+			}
+		}
+		for(SimpleName sn : vard){
+			if(variablesList.contains(convertToString(sn))){
+				error = true;
+			}
+        }
+		for(QualifiedName qn : fieldList){
+			if(variablesList.contains(convertToString(qn))){
+				error = true;
+			}
+        }
+		return error;
+	}
+	public int checkAssignmentAssertions(ASTNode node) {
 		int asserts = 0;
         Expression right = fVariableDeclaration.getInitializer();
+        QualifiedNameVisitor fa = new QualifiedNameVisitor();
+        right.accept(fa);
+        List<QualifiedName> lfa = fa.getMethods();
+        if(lfa.size() > 0){
+        	for(QualifiedName atual : fields){
+        		SimpleName name = atual.getName();
+        		for(QualifiedName fac : lfa){
+        			SimpleName rn = fac.getName();
+        			if(convertToString(name).compareTo(convertToString(rn)) == 0)
+        					asserts++;
+        		}
+        	}
+        }
+        return asserts;
+	}
+	public void doAssignmentAssertions() throws CoreException{
         QualifiedNameVisitor fa = new QualifiedNameVisitor();
         right.accept(fa);
         List<QualifiedName> lfa = fa.getMethods();
@@ -113,11 +179,12 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
             CompilationUnit cu = (CompilationUnit) parser.createAST(null);
             AST ast = cu.getAST();
     		rewrite = ASTRewrite.create( ast );
-    		cu.recordModifications();
             MethodDeclaration method = getMethodDeclaration(cu);
         	Block b = method.getBody();
 			listRewrite = rewrite.getListRewrite(b,
 	                   Block.STATEMENTS_PROPERTY);
+			AssignmentVisitor assignVisitor = new AssignmentVisitor();
+			b.accept(assignVisitor);
         	for(QualifiedName atual : fields){
         			SimpleName name = atual.getName();
         			Name exp = atual.getQualifier();
@@ -133,22 +200,45 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
         					infixExpression.setRightOperand(rightExp);
         					AssertStatement as = ast.newAssertStatement();
         					as.setExpression(infixExpression);
-        					listRewrite.insertLast(as, null);
-        					asserts++;
+        					Assignment at = null;
+        					for(Assignment a : assignVisitor.getMethods()) {
+        						if(convertToString(a.getLeftHandSide()).compareTo(convertToString(atual)) == 0) {
+        							at = a;
+        							break;
+        						}
+        					}
+        					listRewrite.insertBefore(as, at.getParent(), null);
         				}
         			}
         	}
         }
+	}
+	public int checkMethodAssertions() {
+		int asserts = 0;
+		CompilationUnit cu = parse(fCu);
+        Expression right = fVariableDeclaration.getInitializer();
+        MethodDeclaration method = getMethodDeclaration(cu);
+        QualifiedNameVisitor fa = new QualifiedNameVisitor();
+        MethodInvocationVisitor miv = new MethodInvocationVisitor();
+        right.accept(fa);
+        method.accept(miv);
+        List<QualifiedName> lfa = fa.getMethods();
+        List<MethodInvocation> lmi = miv.getMethods();
+        if(lfa.size() > 0 && lmi.size() > 0){
+        	for (int i = 0; i < lmi.size(); i++) {
+				for (int j = 0; j < lfa.size(); j++) {
+					asserts++;
+				}
+			}
+        }
         return asserts;
 	}
-	public int doMethodAssertions() throws JavaModelException{
-		int asserts = 0;
+	public void doMethodAssertions() throws JavaModelException{
         ASTParser parser = ASTParser.newParser(AST.JLS3);
+        System.out.println(fCu.getSource());
         parser.setSource(fCu);
         CompilationUnit cu = (CompilationUnit) parser.createAST(null);
         AST ast = cu.getAST();
-		cu.recordModifications();
-        Expression right = fVariableDeclaration.getInitializer();
         MethodDeclaration method = getMethodDeclaration(cu);
         QualifiedNameVisitor fa = new QualifiedNameVisitor();
         MethodInvocationVisitor miv = new MethodInvocationVisitor();
@@ -167,7 +257,7 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
         		vd.setName(varName);
         		vd.setInitializer(e);
         		VariableDeclarationStatement vds = ast.newVariableDeclarationStatement(vd);
-				listRewrite.insertLast(vds, null);
+				listRewrite.insertAt(vds,nodePosition, null);
 				i++;
         	}
         	for(MethodInvocation m : lmi){
@@ -183,13 +273,19 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 					infixExpression.setRightOperand(rightExp);
 					AssertStatement as = ast.newAssertStatement();
 					as.setExpression(infixExpression);
-					listRewrite.insertLast(as, null);
-					asserts++;
+					List <Statement> statements  = listRewrite.getRewrittenList();
+					int pos = m.getParent().getStartPosition();
+					Statement state = null;
+					for(Statement node : statements) {
+						if(node.getStartPosition() == pos) {
+							state = node;
+						}
+					}
+					listRewrite.insertAfter(as, state, null);
 					i++;
             	}
         	}
         }
-        return asserts;
 	}
 	@Override
 	public RefactoringStatus checkFinalConditions(IProgressMonitor pm) throws CoreException {
@@ -211,43 +307,6 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		}
 		return fASTRoot;
 	}
-	public boolean checkReadOnly(CompilationUnit un) {
-		boolean error = false;
-		getVariableDeclaration();
-		AssignmentVisitor assignmentVisitor = new AssignmentVisitor();
-		Expression right = fVariableDeclaration.getInitializer();
-		SimpleNameVisitor simpleNameVisitor = new SimpleNameVisitor();
-		QualifiedNameVisitor qualifiedNameVisitor = new QualifiedNameVisitor();
-		right.accept(simpleNameVisitor);
-		int expressionPosition = right.getStartPosition();
-		List<SimpleName> vard = simpleNameVisitor.getMethods(); 
-		right.accept(qualifiedNameVisitor);
-		List<QualifiedName> fieldList = qualifiedNameVisitor.getMethods(); 
-		MethodDeclaration methodVerified= getMethodDeclaration(un);
-		methodVerified.accept(assignmentVisitor);
-		List<String> variablesList = new ArrayList<String>();
-		for(Assignment assignment : assignmentVisitor.getMethods()){
-			Expression aux = assignment.getLeftHandSide();
-			int assignPosition = aux.getStartPosition();
-			if(assignPosition > expressionPosition){
-				if(aux.getNodeType() == 40){
-					this.fields.add((QualifiedName)aux);
-				}
-				variablesList.add(convertToString(aux));
-			}
-		}
-		for(SimpleName sn : vard){
-			if(variablesList.contains(convertToString(sn))){
-				error = true;
-			}
-        }
-		for(QualifiedName qn : fieldList){
-			if(variablesList.contains(convertToString(qn))){
-				error = true;
-			}
-        }
-		return error;
-	}
 	public VariableDeclaration getVariableDeclaration() {
 		if (fVariableDeclaration == null) {
 			fVariableDeclaration= TempDeclarationFinder.findTempDeclaration(getASTRoot(), fSelectionStart, fSelectionLength);
@@ -255,7 +314,6 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 		return fVariableDeclaration;
 	}
 	public MethodDeclaration getMethodDeclaration(CompilationUnit un) {
-        Expression right = fVariableDeclaration.getInitializer();
         int pos = right.getStartPosition();
 		MethodDeclarationVisitor mdv = new MethodDeclarationVisitor();
 	    un.accept(mdv);
