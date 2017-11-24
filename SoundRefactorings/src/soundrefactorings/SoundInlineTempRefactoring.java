@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.SubProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
@@ -28,8 +29,11 @@ import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.RefactoringCoreMessages;
 import org.eclipse.jdt.internal.corext.refactoring.code.InlineTempRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.rename.TempDeclarationFinder;
+import org.eclipse.jdt.internal.corext.refactoring.structure.CompilationUnitRewrite;
 import org.eclipse.jdt.internal.corext.refactoring.util.RefactoringASTParser;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
@@ -64,7 +68,6 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 	public Change createChange(IProgressMonitor pm) throws CoreException {
 		Change change = super.createChange(pm);
 		change.perform(pm);
-		System.out.println(fCu.getSource());
 		if(fModifications) {
 			doAssignmentAssertions();
 			doMethodAssertions();
@@ -235,7 +238,6 @@ public class SoundInlineTempRefactoring extends InlineTempRefactoring{
 	}
 	public void doMethodAssertions() throws JavaModelException{
         ASTParser parser = ASTParser.newParser(AST.JLS3);
-        System.out.println(fCu.getSource());
         parser.setSource(fCu);
         CompilationUnit cu = (CompilationUnit) parser.createAST(null);
         AST ast = cu.getAST();

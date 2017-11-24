@@ -3,6 +3,7 @@ package soundrefactorings;
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.core.runtime.AssertionFailedException;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.internal.ui.refactoring.InlineTempWizard;
@@ -52,7 +53,9 @@ public class RefactoringHandler extends AbstractHandler {
 			    change.perform(monitor);
 		    }*/
 			
-		} catch (Exception e) {
+		}catch(AssertionFailedException a) {
+			a.printStackTrace();
+		}catch (Exception e) {
 		    // TODO Auto-generated catch block
 		    e.printStackTrace();
 		}
